@@ -52,6 +52,11 @@ router.get('/', async (req, res, next) => {
  */
 router.post('/', validate({ body: createSchema }), async (req, res, next) => {
   try {
+    // No `permission` row is created by default. The Permission model
+    // represents *explicit overrides* for a member; without one,
+    // resolvePermissions() gives admins all-true and members the role
+    // defaults. Creating a row with `{}` would fill in schema defaults
+    // (mostly false) and indistinguishably look like a downgraded admin.
     const workspace = await prisma.workspace.create({
       data: {
         ...req.body,
@@ -60,7 +65,6 @@ router.post('/', validate({ body: createSchema }), async (req, res, next) => {
           create: {
             userId: req.user.id,
             role: 'ADMIN',
-            permission: { create: {} }, // defaults
           },
         },
       },

@@ -74,33 +74,40 @@ async function main() {
     },
   });
 
-  // Memberships — demo as ADMIN, others as MEMBER
-  await prisma.membership.upsert({
+  // Memberships — demo as ADMIN (no permission row → all flags resolve true),
+  // others as MEMBER. Sam gets one explicit override to demo the RBAC matrix.
+  const adminMembership = await prisma.membership.upsert({
     where: { workspaceId_userId: { workspaceId: workspace.id, userId: demo.id } },
-    update: {},
+    update: { role: 'ADMIN' },
     create: {
       workspaceId: workspace.id,
       userId: demo.id,
       role: 'ADMIN',
-      permission: { create: {} },
     },
   });
+  // Self-heal: if a previous (buggy) seed run created a Permission row for
+  // the admin, drop it so the admin gets all-true defaults.
+  await prisma.permission
+    .delete({ where: { membershipId: adminMembership.id } })
+    .catch(() => {});
+
   for (const t of teammates) {
-    await prisma.membership.upsert({
+    const m = await prisma.membership.upsert({
       where: { workspaceId_userId: { workspaceId: workspace.id, userId: t.id } },
       update: {},
       create: {
         workspaceId: workspace.id,
         userId: t.id,
         role: 'MEMBER',
-        permission: {
-          create: {
-            // Sam can post announcements as a demo of the RBAC matrix
-            canPostAnnouncement: t.email === 'sam@fredocloud.test',
-          },
-        },
       },
     });
+    if (t.email === 'sam@fredocloud.test') {
+      await prisma.permission.upsert({
+        where: { membershipId: m.id },
+        create: { membershipId: m.id, canPostAnnouncement: true },
+        update: { canPostAnnouncement: true },
+      });
+    }
   }
 
   // Goals (idempotent via stable id)

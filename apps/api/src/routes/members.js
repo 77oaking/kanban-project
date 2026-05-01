@@ -163,7 +163,7 @@ router.post('/invitations/accept', async (req, res, next) => {
         workspaceId: invite.workspaceId,
         userId: user.id,
         role: invite.role,
-        permission: { create: {} },
+        // No permission row by default — see workspaces.js for rationale.
       },
     });
     await prisma.invitation.update({
@@ -208,6 +208,14 @@ router.patch(
 
       const data = {};
       if (req.body.role) data.role = req.body.role;
+
+      // If the role changed and the caller didn't also pass new permissions,
+      // wipe any existing override row so the member transitions to fresh
+      // role defaults instead of carrying old flags forward.
+      const roleChanged = req.body.role && req.body.role !== target.role;
+      if (roleChanged && !req.body.permissions && target.permission) {
+        await prisma.permission.delete({ where: { membershipId } });
+      }
 
       const updated = await prisma.membership.update({
         where: { id: membershipId },

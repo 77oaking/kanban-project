@@ -1,139 +1,221 @@
 # FredoCloud Team Hub
 
-A full-stack collaborative workspace for shared goals, real-time announcements, and a kanban of action items. Built as a technical assessment for **FredoCloud**.
+A full-stack collaborative workspace for shared goals, real-time announcements, and a kanban of action items. Built end-to-end on Next.js 14, Express, PostgreSQL, and Socket.io for the **FredoCloud technical assessment**.
 
-> **Live URLs**
-> - Web: `https://your-web.up.railway.app` *(replace after deploying)*
-> - API: `https://your-api.up.railway.app`
-> - API docs (Swagger): `https://your-api.up.railway.app/api/docs`
->
-> **Demo login** &mdash; `demo@fredocloud.test` / `Demo1234!`
-
----
-
-## Project overview
-
-A monorepo with two deployable apps:
-
-| Path | Service | Stack |
-|------|---------|-------|
-| `apps/web` | Next.js 14 frontend (App Router, JS) | Tailwind, Zustand, Recharts, Tiptap, Socket.io-client, cmdk |
-| `apps/api` | Express REST + Socket.io backend | Prisma, PostgreSQL, JWT (httpOnly cookies), Cloudinary, Zod, Swagger |
-
-The two services share a single Postgres database and communicate over HTTP + WebSockets. Auth is JWT in **httpOnly cookies** (access + refresh, with rotation on each refresh). Realtime is Socket.io, authenticated via the same access cookie.
-
-### Feature checklist (assignment requirements)
-
-- [x] **Auth** &mdash; email/password register & login, protected routes, profile + Cloudinary avatar upload, logout, refresh-token rotation.
-- [x] **Workspaces** &mdash; create, switch, invite by email, Admin/Member roles, name/description/accent color.
-- [x] **Goals & Milestones** &mdash; goals with title/owner/dueDate/status, nested milestones with progress %, per-goal activity feed.
-- [x] **Announcements** &mdash; rich-text editor (Tiptap), emoji reactions, comments, pinning.
-- [x] **Action Items** &mdash; assignee, priority, due date, status, link to parent goal, **Kanban board** + **list view** toggle.
-- [x] **Real-time** &mdash; Socket.io broadcasts new posts, reactions, status changes; **online presence** in the topbar; **@mention** in comments triggers in-app notifications.
-- [x] **Analytics** &mdash; dashboard stats (totals, completed-this-week, overdue), Recharts area chart, **CSV export** of the workspace.
-
-### Advanced features (assignment asks for 2 &mdash; 2 + 1 stretch are implemented)
-
-1. **Optimistic UI** &mdash; reactions, status changes, kanban drags, and pinning all update Zustand state immediately and roll back on server error. See `apps/web/store/*` &mdash; every mutator follows the pattern `set(optimistic) → api.x() → set(server) | set(rollback)`.
-2. **Advanced RBAC** &mdash; per-member permission matrix with 9 fine-grained flags (`canCreateGoal`, `canPostAnnouncement`, `canPinAnnouncement`, `canInviteMember`, `canManageMembers`, &hellip;). Backend enforces with `requirePerm(...)` middleware; the Members page exposes the matrix to admins. See `apps/api/src/middleware/workspace.js` and the `Permission` model in the Prisma schema.
-3. *(stretch)* **Real-time collaborative editing** on the goal description &mdash; multiple users editing a goal see each other's changes live via Socket.io. Last-writer-wins on the broadcast; persistence is explicit (Save button or blur).
-
-### Bonus features
-
-- [x] **Dark / light theme** &mdash; `next-themes` with system preference detection.
-- [x] **Keyboard shortcuts** &mdash; `⌘K` / `Ctrl+K` opens a `cmdk` command palette for navigation, workspace switching, theme, and sign-out.
-- [x] **OpenAPI / Swagger** &mdash; served at `/api/docs` via `swagger-jsdoc` + `swagger-ui-express`.
-- [x] **Email notifications** &mdash; Nodemailer wraps any SMTP provider (Resend / Mailtrap / Gmail). Invitations and `@mention` notifications email the recipient. **Falls back gracefully when SMTP is not configured** &mdash; the call no-ops and logs the email payload to the server console, so local dev never breaks.
-- [x] **PWA** &mdash; installable web app via `next-pwa` with a manifest, SVG icons, runtime caching for assets and API GETs (`NetworkFirst` with a 4s timeout, so the app degrades to last-known data when offline).
-- [x] **Tests** &mdash; Jest + Supertest for the backend (auth integration test with mocked Prisma, plus unit tests for the sanitiser, RBAC permission resolver, and email templates) and React Testing Library on the frontend (login form, format helpers, priority badge).
+| | |
+|---|---|
+| **Live web app** | https://fredocloudteamhub.dev |
+| **Live API** | https://kanban-project-production-aab6.up.railway.app |
+| **API documentation (Swagger)** | https://kanban-project-production-aab6.up.railway.app/api/docs |
+| **Health check** | https://kanban-project-production-aab6.up.railway.app/health |
+| **GitHub repo** | https://github.com/77oaking/kanban-project |
+| **Demo login** | `demo@fredocloud.test` / `Demo1234!` |
 
 ---
 
-## Architecture
+## Try it in 30 seconds
+
+1. Open the live web app → https://fredocloudteamhub.dev
+2. Click **Try the demo**, sign in with `demo@fredocloud.test` / `Demo1234!`
+3. You land in a pre-seeded workspace ("FredoCloud HQ") with sample goals, milestones, action items, and a pinned announcement.
+4. Open the same URL in a second browser tab to see the real-time presence dots, live socket updates, and collaborative goal-description editing.
+
+---
+
+## What's built
+
+### Required features (assignment specification)
+
+Every feature listed in the "What to Build" section of the assignment is implemented.
+
+**Authentication**
+- Email + password registration and login
+- Protected routes — the dashboard is unreachable without a session
+- User profile with Cloudinary avatar upload
+- Logout, plus automatic refresh-token rotation in httpOnly cookies
+
+**Workspaces**
+- Create multiple workspaces and switch between them via the sidebar dropdown or the ⌘K palette
+- Invite members by email (Admin or Member role); accept-invite flow lives at `/accept-invite?token=...`
+- Each workspace has a name, description, and accent color that themes the UI
+
+**Goals & Milestones**
+- Create goals with title, owner, due date, and status (Not started / In progress / At risk / Completed)
+- Nested milestones with a 0–100 progress slider and a completion checkbox
+- An **overall progress bar** on every goal showing the average of milestone progress
+- Per-goal activity feed — post text updates that other members see live
+
+**Announcements**
+- Admins (or members granted `canPostAnnouncement`) publish rich-text announcements via a Tiptap editor
+- Six emoji reactions, threaded comments, and a **pin to top** flag
+- Comments parse `@mentions` against workspace members and trigger an in-app notification (and an email if SMTP is configured)
+
+**Action Items**
+- Create with assignee, priority (Low/Medium/High/Urgent), due date, and status
+- Optional link to a parent goal
+- **Kanban board** with HTML5 drag-and-drop across four columns, plus a **list view** toggle
+- Drag-reorders are persisted in a single bulk transaction
+
+**Real-time & activity**
+- Socket.io broadcasts new posts, reactions, status changes, and milestone edits to everyone in the workspace
+- A **presence row** in the top bar shows which members are currently online (with avatars and a green dot)
+- `@mention` parsing creates a notification record and pushes it via socket to that user's bell icon
+
+**Analytics**
+- Dashboard stat cards: total goals, items completed this week, overdue count, member count
+- A 30-day **Recharts area chart** of action-item completions
+- Goal-by-status progress bars
+- **CSV export** of the full workspace (goals, items, announcements) at one click
+
+---
+
+### Advanced features (the difficult ones)
+
+The assignment asks for **two**. I picked the two recommended ones and added a third as a stretch goal.
+
+#### 1. Optimistic UI (advanced)
+
+Every Zustand mutator follows the same shape: apply the change locally first, fire the API call, and roll back on error. This is wired across every interactive surface — reactions, status changes, kanban drags, pinning, milestone updates. The pattern is identical everywhere, which makes it auditable:
+
+```js
+// inside a Zustand store
+update: async (id, patch) => {
+  const prev = state.list;
+  set({ list: prev.map(applyPatch(id, patch)) });   // 1. optimistic
+  try {
+    const { item } = await api.patch(...);
+    set({ list: prev.map(applyServer(item)) });      // 2. reconcile
+  } catch (err) {
+    set({ list: prev });                             // 3. rollback
+    toast.error(err.message);
+  }
+}
+```
+
+Concurrent edits from other users converge correctly because the realtime socket layer applies server-authoritative state on top.
+
+Where to look: `apps/web/store/goals.js`, `actionItems.js`, `announcements.js`.
+
+#### 2. Advanced RBAC (advanced)
+
+A per-member permission matrix with **nine fine-grained flags**:
+
+`canCreateGoal`, `canEditGoal`, `canDeleteGoal`, `canCreateActionItem`, `canPostAnnouncement`, `canPinAnnouncement`, `canInviteMember`, `canManageMembers`, `canExportData`.
+
+The Permission table represents *explicit overrides*, not stored values. Resolution rule:
+
+- **Admin** without an override row → all flags true
+- **Admin** with an override row → flag follows the row (admin can be downgraded per-flag)
+- **Member** without an override row → role defaults (e.g. `canCreateGoal=true`, `canPostAnnouncement=false`)
+- **Member** with an override row → flag follows the row (members can be elevated per-flag)
+
+Endpoints are protected by `requirePerm('canPostAnnouncement')` middleware so the policy is testable, and the resolved flags are returned to the client so the UI can hide buttons the user can't use. The Members page exposes the whole matrix to admins as a bank of checkboxes.
+
+Where to look: `apps/api/src/middleware/workspace.js` (`resolvePermissions`), `apps/api/src/routes/members.js`, `apps/web/app/(app)/members/page.js`.
+
+#### 3. Real-time collaborative editing (stretch)
+
+When two users open the same goal, they see each other's edits to the description live, peer-by-peer through Socket.io. Last-writer-wins on the broadcast; persistence is explicit (Save button or blur). Not a full CRDT/OT engine, but the integration is real and visible.
+
+Where to look: `apps/web/components/collaborative-description.jsx`, `apps/api/src/realtime/socket.js`.
+
+---
+
+### Bonus features (the easy ones — all six implemented)
+
+| Bonus | Status | Implementation |
+|---|---|---|
+| **Dark / light theme** | ✅ | `next-themes` with system preference detection. Toggle in the topbar and inside the ⌘K palette. Tailwind class strategy. |
+| **⌘K command palette** | ✅ | `cmdk`-powered palette opens with `⌘K` / `Ctrl+K`. Navigates between pages, switches workspaces, swaps theme, signs out. See `apps/web/components/command-palette.jsx`. |
+| **OpenAPI / Swagger docs** | ✅ | Served at `/api/docs`. Every route file has `@openapi` JSDoc that `swagger-jsdoc` compiles. See the next section for how to use them. |
+| **Email notifications** | ✅ | Nodemailer wraps any SMTP provider. Invitations and `@mention` comments email the recipient. **Falls back gracefully** to console-log if SMTP isn't configured, so dev never breaks. See `apps/api/src/services/email.js`. |
+| **PWA — installable + offline shell** | ✅ | `next-pwa` with manifest, SVG icons (any/maskable), and runtime caching. API GETs use NetworkFirst with a 4-second timeout so offline users see last-known data. |
+| **Tests (Jest + Supertest + RTL)** | ✅ | 25 backend tests + 9 frontend tests across 7 suites. Auth integration test mocks Prisma so it runs without a database. Covers auth flow, RBAC resolver, HTML sanitiser, email templates, format helpers, and React components. |
+
+---
+
+## How to use the API docs (Swagger)
+
+Open https://kanban-project-production-aab6.up.railway.app/api/docs in your browser. You'll see the full Swagger UI listing every endpoint grouped by tag (Auth, Workspaces, Members, Goals, Announcements, Action items, Notifications, Analytics, Upload).
+
+To call a protected endpoint from the docs page:
+
+1. **Log in first** in another tab — open https://fredocloudteamhub.dev/login and sign in with the demo credentials. This sets `access_token` and `refresh_token` httpOnly cookies on `*.up.railway.app` and `fredocloudteamhub.dev`.
+2. **Back in Swagger UI**, expand any endpoint under "Workspaces" or "Goals". Click **Try it out**.
+3. Fill in path/body parameters. For workspace-scoped endpoints, the seeded workspace ID is `seed-workspace-1`.
+4. Click **Execute**. The browser will send the request *with cookies*, so the auth middleware sees you as the demo user. The response section shows status, headers, and the JSON body.
+
+If you'd rather call the API from cURL or Postman, copy the cURL command Swagger generates and add `--cookie` with the values from your browser's DevTools → Application → Cookies.
+
+The raw OpenAPI 3.0 spec is also available as JSON at `/api/openapi.json` if you want to import it into Postman/Insomnia.
+
+---
+
+## Tech stack
+
+| Layer | Choice | Why |
+|---|---|---|
+| **Monorepo** | Turborepo | Shared scripts, parallel dev, build pipeline caching |
+| **Frontend** | Next.js 14 (App Router, JS) | Modern React with server components and streaming |
+| **Styling** | Tailwind CSS | Utility-first, dark-mode class strategy |
+| **State** | Zustand | Lightweight, hooks-friendly, great for the optimistic-UI pattern |
+| **Charts** | Recharts | Declarative, ResponsiveContainer just works |
+| **Rich text** | Tiptap | ProseMirror-based, customizable, sane HTML output |
+| **Command palette** | cmdk | Same library Linear/Vercel use; tiny |
+| **Backend** | Node.js + Express 4 | Familiar, fast, well-supported |
+| **ORM** | Prisma | Type-safe queries, migrations, Studio for inspection |
+| **Database** | PostgreSQL 16 | Railway plugin |
+| **Auth** | JWT in httpOnly cookies, refresh-token rotation | Resistant to XSS token theft, no localStorage |
+| **Realtime** | Socket.io | Room-based broadcasts, cookie auth, presence map |
+| **File storage** | Cloudinary | Free tier covers avatars + attachments |
+| **Email** | Nodemailer | Works with any SMTP (Resend, Mailtrap, Gmail) |
+| **API docs** | swagger-jsdoc + swagger-ui-express | OpenAPI 3 from JSDoc comments on routes |
+| **Tests** | Jest + Supertest + React Testing Library | Backend integration via mocked Prisma; frontend RTL |
+| **Hosting** | Railway (web + api + Postgres) | One project, separate services, automatic env injection |
+
+---
+
+## Repository layout
 
 ```
 fredocloud-team-hub/                ← Turborepo root
 ├─ apps/
 │  ├─ api/                          ← Express + Prisma + Socket.io
 │  │  ├─ prisma/schema.prisma       ← Data model
+│  │  ├─ scripts/test.cjs           ← Hoist-safe Jest bootstrap
+│  │  ├─ tests/                     ← Jest + Supertest test suites
 │  │  └─ src/
-│  │     ├─ index.js                ← Server bootstrap (HTTP + Socket.io)
+│  │     ├─ index.js                ← HTTP + Socket.io bootstrap
 │  │     ├─ app.js                  ← Express app + route mounts
 │  │     ├─ realtime/socket.js      ← Sockets, presence, mentions, live edit
 │  │     ├─ middleware/             ← auth, workspace+RBAC, validate, error
 │  │     ├─ routes/                 ← auth, workspaces, members, goals,
-│  │     │                             announcements, action items, stats,
-│  │     │                             export, notifications, upload, invitations
-│  │     ├─ services/audit.js       ← Append-only audit log writer
-│  │     ├─ lib/                    ← prisma, jwt, cookies, cloudinary, swagger
-│  │     └─ seed.js                 ← Idempotent demo data
+│  │     │                              announcements, actionItems, stats,
+│  │     │                              export, notifications, upload, invitations
+│  │     ├─ services/               ← audit, email, email-templates
+│  │     ├─ lib/                    ← prisma, jwt, cookies, cloudinary,
+│  │     │                              swagger, sanitize, logger
+│  │     └─ seed.js                 ← Idempotent demo data, self-healing
 │  └─ web/                          ← Next.js 14 App Router (JS)
 │     ├─ app/
 │     │  ├─ (auth)/                 ← Login + register + auth layout
 │     │  ├─ (app)/                  ← Protected shell: dashboard, goals,
-│     │  │                             announcements, action-items, members,
-│     │  │                             settings, profile
-│     │  ├─ accept-invite/          ← Invitation acceptance flow
+│     │  │                              announcements, action-items, members,
+│     │  │                              settings, profile
+│     │  ├─ accept-invite/          ← Invitation acceptance (server + client)
 │     │  ├─ layout.js               ← Theme + auth bootstrap
 │     │  └─ page.js                 ← Public landing
-│     ├─ components/                ← UI components (sidebar, topbar,
-│     │                               kanban-board, rich-text-editor,
-│     │                               collaborative-description, command-palette…)
-│     ├─ store/                     ← Zustand stores (auth, workspace,
-│     │                               goals, action-items, announcements,
-│     │                               notifications, ui)
-│     └─ lib/                       ← api client, socket, format helpers
+│     ├─ components/                ← Sidebar, topbar, kanban-board,
+│     │                                 rich-text-editor, command-palette,
+│     │                                 collaborative-description, etc.
+│     ├─ store/                     ← Zustand stores
+│     ├─ tests/                     ← Jest + RTL suites
+│     ├─ public/                    ← manifest.json, icons, favicon
+│     └─ lib/                       ← api client, socket, format, cn
 ├─ turbo.json
-└─ package.json (workspaces)
+├─ package.json (workspaces)
+└─ README.md (this file)
 ```
-
-### Auth flow
-
-1. POST `/api/auth/register` or `/api/auth/login` creates a `User` and writes two cookies:
-   - `access_token` &mdash; signed with `JWT_ACCESS_SECRET`, 15 minutes.
-   - `refresh_token` &mdash; signed with `JWT_REFRESH_SECRET`, 7 days, also stored hashed in the `RefreshToken` table.
-2. Every API call sends both cookies (`credentials: 'include'`).
-3. On a 401 the client transparently calls `/api/auth/refresh` once. The server validates the hash in the DB, **revokes** the old token, issues a new pair, and stores the new hash. Replays of an old refresh token are rejected.
-4. Logout revokes the refresh token and clears the cookies.
-
-In production both cookies are `Secure; SameSite=None` so the Railway frontend on `*.up.railway.app` can talk to the API on a different `*.up.railway.app` subdomain.
-
-### Realtime layer
-
-- Sockets authenticate by reading the `access_token` cookie on the upgrade request &mdash; no separate token negotiation.
-- After `connection`, the client emits `workspace:join` with the active workspace id; the server verifies membership and joins the socket to a `workspace:<id>` room.
-- Mutations on the API broadcast to the room (`broadcast(workspaceId, event, payload)`); the web client merges them into the Zustand stores.
-- Online presence is maintained server-side in an in-memory `Map<workspaceId, Set<userId>>` and emitted as `presence:update` events. (For multi-instance deployments you'd swap this for the Redis adapter.)
-- `@mentions` in comments are parsed server-side and create `Notification` rows + per-user `notification:new` events.
-
-### Optimistic UI pattern
-
-Every Zustand store mutator follows the same shape:
-
-```js
-update: async (id, patch) => {
-  const prev = state.list;
-  set({ list: prev.map(applyPatch(id, patch)) });   // optimistic
-  try {
-    const { item } = await api.patch(...);
-    set({ list: prev.map(applyServer(item)) });      // reconcile
-  } catch (err) {
-    set({ list: prev });                             // rollback
-    toast.error(err.message);
-  }
-}
-```
-
-Reactions toggle, kanban drags reorder in a single transaction, and goal status transitions all reflect instantly. The realtime listeners apply server-authoritative state on top, so two users dragging concurrently converge.
-
-### RBAC
-
-`Membership.role` is the coarse axis (`ADMIN` / `MEMBER`). `Permission` is a 1-to-1 child carrying the fine-grained flags. Resolution rule (`apps/api/src/middleware/workspace.js`):
-
-- An ADMIN's flag is `true` unless the `Permission` row explicitly overrides it to `false`.
-- A MEMBER falls back to the per-flag default in the schema.
-
-Endpoints guard with `requirePerm('canPostAnnouncement')` etc. so the whole matrix is testable and serializable to the client (which uses it to hide buttons).
 
 ---
 
@@ -141,149 +223,146 @@ Endpoints guard with `requirePerm('canPostAnnouncement')` etc. so the whole matr
 
 ### Prerequisites
 
-- Node.js **18.17+**
-- PostgreSQL (local install **or** a Railway dev DB)
-- A Cloudinary account (free tier is fine) for avatars / attachments. The app **runs without it** &mdash; just upload endpoints will return `503`.
+- Node.js **18.17+** (`node --version`)
+- Git
+- A PostgreSQL database — either a local install or a Railway Postgres plugin (its `DATABASE_PUBLIC_URL` works fine over the internet for dev)
+- A Cloudinary account is **optional** — the app runs without it, only `/api/upload` returns 503
 
 ### Setup
 
 ```bash
-# 1. Clone and install workspace deps
-git clone <repo-url> fredocloud-team-hub
-cd fredocloud-team-hub
+git clone https://github.com/77oaking/kanban-project.git
+cd kanban-project
 npm install
 
-# 2. Configure the API
+# Backend env
 cp apps/api/.env.example apps/api/.env
-# edit apps/api/.env:
-#   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/fredocloud
-#   JWT_ACCESS_SECRET=$(node -e "console.log(require('crypto').randomBytes(48).toString('hex'))")
-#   JWT_REFRESH_SECRET=$(node -e "console.log(require('crypto').randomBytes(48).toString('hex'))")
-#   CLOUDINARY_CLOUD_NAME=...
-#   CLOUDINARY_API_KEY=...
-#   CLOUDINARY_API_SECRET=...
+# Open apps/api/.env and fill in DATABASE_URL plus the JWT secrets.
+# Generate secrets with:
+#   node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 
-# 3. Configure the web app
+# Frontend env
 cp apps/web/.env.example apps/web/.env.local
 
-# 4. Migrate + seed
-npm run db:migrate    # creates the schema
-npm run db:seed       # inserts the demo workspace + accounts
+# Migrate + seed the database
+npm run db:migrate          # creates schema + generates Prisma client
+npm run db:seed             # inserts the demo workspace + accounts
 
-# 5. Run everything
+# Run everything
 npm run dev
 ```
 
-`npm run dev` runs both apps via Turbo. The web app is on `http://localhost:3000`, the API on `http://localhost:4000`, Swagger on `http://localhost:4000/api/docs`.
+Visit `http://localhost:3000` (web) and `http://localhost:4000/api/docs` (Swagger).
 
-### Useful root scripts
+### Useful scripts (run from the repo root)
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | Run web + api in parallel (Turbo) |
+| `npm run dev` | Run web + api in parallel |
 | `npm run build` | Build both apps |
 | `npm run lint` | Lint both apps |
-| `npm run test` | Run Jest test suites (backend + frontend) |
-| `npm run db:migrate` | `prisma migrate dev` against the API |
-| `npm run db:seed` | Seed the demo account + sample workspace |
-| `npm run db:studio` | Prisma Studio |
-
-### Running tests
-
-Backend tests use Jest + Supertest. Prisma is mocked in the integration test, so **no database is required** to run them.
-
-```bash
-cd apps/api && npm test
-# or from the repo root:
-npm run test
-```
-
-Frontend tests use Jest + React Testing Library against the Next.js component tree.
-
-```bash
-cd apps/web && npm test
-```
+| `npm run test` | Run all Jest test suites (no DB required) |
+| `npm run db:migrate` | `prisma migrate dev` |
+| `npm run db:seed` | Re-seed the demo data (idempotent) |
+| `npm run db:studio` | Open Prisma Studio in the browser |
 
 ---
 
-## Deploying to Railway
+## Running tests
 
-1. **Create a Railway project** &mdash; from the dashboard, "New Project → Empty Project".
-2. **Add a Postgres plugin** &mdash; click "+ New → Database → PostgreSQL". Railway auto-injects `DATABASE_URL` into any service in the project that references it.
-3. **Add the API service** &mdash; "+ New → GitHub repo → this repo". Set:
-   - **Root directory**: `apps/api`
-   - **Build / Start**: pulled from `apps/api/railway.json` (Nixpacks).
-   - **Variables**:
-     ```
-     DATABASE_URL=<from Postgres plugin>
-     JWT_ACCESS_SECRET=<random 48 bytes>
-     JWT_REFRESH_SECRET=<random 48 bytes>
-     CLOUDINARY_CLOUD_NAME=...
-     CLOUDINARY_API_KEY=...
-     CLOUDINARY_API_SECRET=...
-     CLIENT_URL=https://your-web.up.railway.app
-     NODE_ENV=production
-     ```
-   - Generate a public domain &mdash; copy it; this is your API URL.
-4. **Add the web service** &mdash; "+ New → GitHub repo → this repo" again. Set:
-   - **Root directory**: `apps/web`
-   - **Variables**:
-     ```
-     NEXT_PUBLIC_API_URL=https://your-api.up.railway.app
-     NEXT_PUBLIC_SOCKET_URL=https://your-api.up.railway.app
-     ```
-   - Generate a public domain.
-5. **Update the API's `CLIENT_URL`** to match the web service's domain (CORS + cookie SameSite).
-6. **Trigger a deploy.** The API's `start` script runs `prisma migrate deploy` and seeds an empty database with the demo account, so first boot leaves you with a working login.
+There are 34 tests total across 7 suites. The backend integration tests **mock Prisma**, so the suite runs without a database.
+
+```bash
+# Everything (root)
+npm run test
+
+# Backend only
+cd apps/api && npm test
+
+# Frontend only
+cd apps/web && npm test
+```
+
+Backend test files (`apps/api/tests/`):
+
+- `auth.integration.test.js` — register, login, refresh-token rotation, `/me` endpoint, no-cookie 401
+- `rbac.test.js` — admin defaults, member defaults, per-flag overrides
+- `sanitize.test.js` — script-tag stripping, `on*` handler removal, `javascript:` URL rewriting, allow-list enforcement
+- `email-templates.test.js` — invitation + mention HTML/text content, XSS escaping
+
+Frontend test files (`apps/web/tests/`):
+
+- `login-page.test.jsx` — login form renders, demo email prefilled, password input is editable
+- `priority-badge.test.jsx` — renders priority label, distinct styles per priority
+- `format.test.js` — date formatter, overdue checker, relative-time formatter
 
 ---
 
 ## Environment variables
 
-### Backend (`apps/api/.env`)
+### Backend — `apps/api/.env`
 
 | Var | Required | Notes |
-|-----|---|---|
-| `DATABASE_URL` | yes | Postgres connection string. Railway injects automatically. |
-| `JWT_ACCESS_SECRET` | yes | 48+ bytes recommended. |
+|---|---|---|
+| `DATABASE_URL` | yes | Postgres connection string. Railway injects this. |
+| `JWT_ACCESS_SECRET` | yes | 48+ random bytes recommended. |
 | `JWT_REFRESH_SECRET` | yes | Must differ from access secret. |
 | `JWT_ACCESS_TTL` | no | Default `15m`. |
 | `JWT_REFRESH_TTL` | no | Default `7d`. |
 | `CLIENT_URL` | yes | Comma-separated origins for CORS. |
-| `CLOUDINARY_CLOUD_NAME` / `_API_KEY` / `_API_SECRET` | optional | If absent, `/api/upload` returns `503`. |
-| `PORT` | no | Default `4000`; Railway injects. |
+| `CLOUDINARY_CLOUD_NAME` / `_API_KEY` / `_API_SECRET` | optional | If absent, `/api/upload` returns 503. |
+| `SMTP_HOST` / `_PORT` / `_USER` / `_PASS` / `_FROM` | optional | If absent, emails log to console instead of sending. |
+| `PORT` | no | Default `4000`. |
 | `NODE_ENV` | no | `production` enables `Secure; SameSite=None` cookies. |
 | `DEMO_EMAIL` / `DEMO_PASSWORD` | no | Override the seeded demo account. |
 
-### Frontend (`apps/web/.env.local`)
+### Frontend — `apps/web/.env.local`
 
 | Var | Required | Notes |
-|-----|---|---|
-| `NEXT_PUBLIC_API_URL` | yes | E.g. `https://your-api.up.railway.app`. |
-| `NEXT_PUBLIC_SOCKET_URL` | yes | Usually identical to `NEXT_PUBLIC_API_URL`. |
+|---|---|---|
+| `NEXT_PUBLIC_API_URL` | yes | Public API base URL. |
+| `NEXT_PUBLIC_SOCKET_URL` | yes | Usually identical to the API URL. |
+
+---
+
+## Deployment (Railway)
+
+The deployed copy lives in a single Railway project with three services: a Postgres plugin, the API service (`apps/api`), and the web service (`apps/web`).
+
+1. Create a new Railway project → "+ New → Database → Add PostgreSQL".
+2. "+ New → GitHub repo" → set root directory to `apps/api`. Add env vars: the JWT secrets, Cloudinary credentials (optional), and `CLIENT_URL=https://fredocloudteamhub.dev`. Railway injects `DATABASE_URL` automatically. Generate a public domain.
+3. "+ New → GitHub repo" again → set root directory to `apps/web`. Add `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_SOCKET_URL` pointing at the API's public domain.
+4. The API's `start` script runs `prisma migrate deploy`, then seeds the demo data if the user table is empty, then starts the server. So a fresh deployment leaves you with a working demo account.
+
+The custom domain `fredocloudteamhub.dev` is mapped to the web service via Railway's Settings → Domains.
+
+---
+
+## Auth & realtime details
+
+**Auth flow.** Register/login writes two cookies: `access_token` (signed with `JWT_ACCESS_SECRET`, 15 minutes) and `refresh_token` (7 days, also stored hashed in the `RefreshToken` table). On a 401 the client transparently calls `/api/auth/refresh` once. The server validates the hash in the DB, **revokes** the old token, and issues a new pair. Each token includes a random `jti` so two tokens issued in the same second are still distinct.
+
+**Realtime.** Socket.io connections authenticate by reading the `access_token` cookie on the WebSocket upgrade. After connection, the client emits `workspace:join` with the active workspace ID; the server verifies membership and joins the socket to a `workspace:<id>` room. Mutations on the API broadcast to that room; the web client merges events into Zustand stores. Online presence is maintained server-side and emitted as `presence:update`.
 
 ---
 
 ## Known limitations
 
-- **Single-instance presence.** The presence map lives in process memory, so horizontally scaling the API would require swapping in `socket.io-redis-adapter` and a shared store.
-- **Real-time collab editing is plain-text + last-writer-wins.** True OT/CRDT was out of scope for the time budget; the live preview & cursor signal demonstrates the integration, but concurrent edits can clobber each other on conflicting edits to the same character range.
-- **Sanitiser is hand-rolled.** Announcement HTML is sanitized with a small allow-list (no DOMPurify/jsdom). Adequate for trusted workspace members, but a hardening pass would swap to DOMPurify on the server.
-- **Test coverage is meaningful, not exhaustive.** The backend tests cover auth flow, RBAC, sanitiser, email templates &mdash; the highest-risk surfaces. We didn't write integration tests for every CRUD endpoint; those would be next.
-- **Audit log has no UI.** Rows are written but not surfaced &mdash; the timeline UI is what audit-log-as-an-advanced-feature would have been.
-- **PWA offline mode is degraded read.** API GETs are `NetworkFirst` with a stale fallback, so offline users see their last view. Write-while-offline queueing is not implemented.
-
----
-
-## Repository hygiene
-
-- Conventional commits throughout (`feat: …`, `fix: …`, `chore: …`, `docs: …`).
-- `.env*` files are gitignored; only `.env.example` is committed.
-- `apps/web/jsconfig.json` defines the `@/*` import alias used everywhere.
-- Prettier config at the root; a single `npm run lint` lints both apps.
+- **Single-instance presence.** The presence map lives in process memory. Horizontally scaling the API would require swapping in `socket.io-redis-adapter`.
+- **Real-time collab editing is plain-text + last-writer-wins.** True OT/CRDT was out of scope; the live preview and peer cursors demonstrate the integration but concurrent edits to the same character range can clobber each other.
+- **Sanitiser is hand-rolled.** Announcement HTML is filtered with a small allow-list. A hardening pass would swap to DOMPurify on the server.
+- **Test coverage is meaningful, not exhaustive.** The highest-risk surfaces (auth, RBAC, sanitiser, email templates) are tested. Per-CRUD-endpoint integration tests would be next.
+- **Audit log has no UI.** Rows are written to `AuditLog` for every mutation, but the timeline UI was deprioritized — that would have been the audit-log-as-an-advanced-feature option.
+- **PWA offline mode is degraded read.** API GETs are cached NetworkFirst with a stale fallback. Write-while-offline queueing is not implemented.
 
 ---
 
 ## Contact
 
-Questions? `hiring@fredocloud.com` &mdash; subject `[Technical Assessment]`.
+Questions about this submission?
+
+- **Candidate:** Azman (`978aho@gmail.com`)
+- **Repo:** https://github.com/77oaking/kanban-project
+- **For the FredoCloud team:** `hiring@fredocloud.com` — subject `[Technical Assessment]`
+
+Thanks for reviewing.

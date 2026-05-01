@@ -37,7 +37,7 @@ router.post('/accept', validate({ body: acceptSchema }), async (req, res, next) 
         workspaceId: invite.workspaceId,
         userId: user.id,
         role: invite.role,
-        permission: { create: {} },
+        // No permission row by default — see workspaces.js for rationale.
       },
     });
     await prisma.invitation.update({

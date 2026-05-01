@@ -11,8 +11,8 @@ export const swaggerSpec = swaggerJsdoc({
       contact: { email: 'hiring@fredocloud.com' },
     },
     servers: [
+      { url: 'https://kanban-project-production-aab6.up.railway.app', description: 'Production' },
       { url: 'http://localhost:4000', description: 'Local' },
-      { url: '{publicUrl}', description: 'Deployed', variables: { publicUrl: { default: 'https://your-api.up.railway.app' } } },
     ],
     components: {
       securitySchemes: {
