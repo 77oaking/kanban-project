@@ -3,11 +3,11 @@
 A full-stack collaborative workspace for shared goals, real-time announcements, and a kanban of action items. Built as a technical assessment for **FredoCloud**.
 
 > **Live URLs**
-> - Web: `https://your-web.up.railway.app` *(replace after deploying)*
-> - API: `https://your-api.up.railway.app`
-> - API docs (Swagger): `https://your-api.up.railway.app/api/docs`
+> - Web: https://fredocloudteamhub.dev/
+> - API: https://kanban-project-production-aab6.up.railway.app/
+> - API docs (Swagger): https://kanban-project-production-aab6.up.railway.app/api/docs
 >
-> **Demo login** &mdash; `demo@fredocloud.test` / `Demo1234!`
+> **Demo login* `demo@fredocloud.test` / `Demo1234!`
 
 ---
 
@@ -149,7 +149,7 @@ Endpoints guard with `requirePerm('canPostAnnouncement')` etc. so the whole matr
 
 ```bash
 # 1. Clone and install workspace deps
-git clone <repo-url> fredocloud-team-hub
+git clone https://github.com/77oaking/kanban-project
 cd fredocloud-team-hub
 npm install
 
@@ -229,8 +229,8 @@ cd apps/web && npm test
    - **Root directory**: `apps/web`
    - **Variables**:
      ```
-     NEXT_PUBLIC_API_URL=https://your-api.up.railway.app
-     NEXT_PUBLIC_SOCKET_URL=https://your-api.up.railway.app
+     NEXT_PUBLIC_API_URL=https://kanban-project-production-aab6.up.railway.app/
+     NEXT_PUBLIC_SOCKET_URL=https://kanban-project-production-aab6.up.railway.app/
      ```
    - Generate a public domain.
 5. **Update the API's `CLIENT_URL`** to match the web service's domain (CORS + cookie SameSite).
