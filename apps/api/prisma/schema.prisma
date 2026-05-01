@@ -1,0 +1,312 @@
+// FredoCloud Team Hub - data model
+// All resources are scoped to a Workspace. Membership rows carry both a coarse
+// Role (ADMIN | MEMBER) and a per-member Permission row that drives the
+// Advanced RBAC matrix.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// USERS & AUTH
+// =============================================================================
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships         Membership[]
+  ownedWorkspaces     Workspace[]      @relation("WorkspaceOwner")
+  ownedGoals          Goal[]           @relation("GoalOwner")
+  assignedActionItems ActionItem[]     @relation("ActionItemAssignee")
+  authoredAnnouncements Announcement[] @relation("AnnouncementAuthor")
+  reactions           Reaction[]
+  comments            Comment[]
+  goalUpdates         GoalUpdate[]
+  notifications       Notification[]   @relation("NotificationRecipient")
+  refreshTokens       RefreshToken[]
+  auditLogs           AuditLog[]
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// =============================================================================
+// WORKSPACES & MEMBERSHIPS
+// =============================================================================
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+model Workspace {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  accentColor String   @default("#7A1F2B") // FredoCloud red
+  owner       User     @relation("WorkspaceOwner", fields: [ownerId], references: [id])
+  ownerId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  memberships   Membership[]
+  invitations   Invitation[]
+  goals         Goal[]
+  announcements Announcement[]
+  actionItems   ActionItem[]
+  notifications Notification[]
+  auditLogs     AuditLog[]
+}
+
+model Membership {
+  id          String   @id @default(cuid())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  role        Role      @default(MEMBER)
+  createdAt   DateTime  @default(now())
+
+  permission  Permission?
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+// Advanced RBAC: per-member permission flags. Defaults follow role, but admins
+// can flip individual flags to grant or revoke specific capabilities.
+model Permission {
+  id                   String     @id @default(cuid())
+  membership           Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  membershipId         String     @unique
+  canCreateGoal        Boolean    @default(true)
+  canEditGoal          Boolean    @default(true)
+  canDeleteGoal        Boolean    @default(false)
+  canCreateActionItem  Boolean    @default(true)
+  canPostAnnouncement  Boolean    @default(false)
+  canPinAnnouncement   Boolean    @default(false)
+  canInviteMember      Boolean    @default(false)
+  canManageMembers     Boolean    @default(false)
+  canExportData        Boolean    @default(true)
+  updatedAt            DateTime   @updatedAt
+}
+
+model Invitation {
+  id          String   @id @default(cuid())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId String
+  email       String
+  role        Role     @default(MEMBER)
+  token       String   @unique
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId, email])
+}
+
+// =============================================================================
+// GOALS, MILESTONES, UPDATES
+// =============================================================================
+
+enum GoalStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  AT_RISK
+  COMPLETED
+}
+
+model Goal {
+  id          String   @id @default(cuid())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId String
+  title       String
+  description String?    @db.Text
+  owner       User       @relation("GoalOwner", fields: [ownerId], references: [id])
+  ownerId     String
+  dueDate     DateTime?
+  status      GoalStatus @default(NOT_STARTED)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  milestones  Milestone[]
+  updates     GoalUpdate[]
+  actionItems ActionItem[]
+
+  @@index([workspaceId, status])
+}
+
+model Milestone {
+  id        String   @id @default(cuid())
+  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  goalId    String
+  title     String
+  progress  Int      @default(0) // 0–100
+  completed Boolean  @default(false)
+  dueDate   DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([goalId])
+}
+
+model GoalUpdate {
+  id        String   @id @default(cuid())
+  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  goalId    String
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  String
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([goalId])
+}
+
+// =============================================================================
+// ANNOUNCEMENTS
+// =============================================================================
+
+model Announcement {
+  id          String   @id @default(cuid())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId String
+  author      User     @relation("AnnouncementAuthor", fields: [authorId], references: [id])
+  authorId    String
+  title       String
+  body        String   @db.Text // HTML from rich-text editor
+  pinned      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  reactions Reaction[]
+  comments  Comment[]
+
+  @@index([workspaceId, pinned, createdAt])
+}
+
+model Reaction {
+  id             String   @id @default(cuid())
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  announcementId String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  emoji          String
+  createdAt      DateTime @default(now())
+
+  @@unique([announcementId, userId, emoji])
+  @@index([announcementId])
+}
+
+model Comment {
+  id             String   @id @default(cuid())
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  announcementId String
+  author         User     @relation(fields: [authorId], references: [id])
+  authorId       String
+  body           String   @db.Text
+  createdAt      DateTime @default(now())
+
+  @@index([announcementId])
+}
+
+// =============================================================================
+// ACTION ITEMS (KANBAN)
+// =============================================================================
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ActionItemStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+}
+
+model ActionItem {
+  id          String   @id @default(cuid())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId String
+  goal        Goal?     @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  goalId      String?
+  title       String
+  description String?     @db.Text
+  assignee    User?       @relation("ActionItemAssignee", fields: [assigneeId], references: [id])
+  assigneeId  String?
+  priority    Priority    @default(MEDIUM)
+  status      ActionItemStatus @default(TODO)
+  dueDate     DateTime?
+  position    Int         @default(0) // for kanban ordering inside a column
+  completedAt DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([workspaceId, status, position])
+}
+
+// =============================================================================
+// NOTIFICATIONS & AUDIT LOG
+// =============================================================================
+
+enum NotificationType {
+  MENTION
+  ASSIGNMENT
+  ANNOUNCEMENT
+  GOAL_UPDATE
+  INVITE
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  recipient   User     @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  recipientId String
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId String?
+  type        NotificationType
+  title       String
+  body        String?
+  link        String?
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([recipientId, read, createdAt])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId String
+  actor       User?     @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorId     String?
+  action      String   // e.g. "goal.created", "announcement.pinned", "member.invited"
+  targetType  String?  // e.g. "Goal", "Announcement"
+  targetId    String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId, createdAt])
+}

@@ -1,0 +1,29 @@
+{
+  "name": "fredocloud-team-hub",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Collaborative Team Hub — FredoCloud technical assessment monorepo",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "start": "turbo run start",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "db:migrate": "turbo run db:migrate --filter=@fredocloud/api",
+    "db:seed": "turbo run db:seed --filter=@fredocloud/api",
+    "db:studio": "turbo run db:studio --filter=@fredocloud/api"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.6",
+    "prettier": "^3.3.2"
+  },
+  "packageManager": "npm@10.5.0",
+  "engines": {
+    "node": ">=18.17.0"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "FredoCloud Team Hub",
+  "short_name": "Team Hub",
+  "description": "Collaborative goals, announcements, and action items for high-output teams.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0e0e11",
+  "theme_color": "#7A1F2B",
+  "categories": ["productivity", "business"],
+  "icons": [
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icons/icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Dashboard", "url": "/dashboard" },
+    { "name": "Action items", "url": "/action-items" },
+    { "name": "Announcements", "url": "/announcements" }
+  ]
+}
